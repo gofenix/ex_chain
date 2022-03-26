@@ -1,0 +1,654 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Elixir实现简易区块链
+
+## 0x00 预备知识
+
+Elixir的hash要用`:crypto.hash`函数来做，比如
+
+```elixir
+value = "zzf"
+:crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"18cdf030040be65ddb634767972c1e2c67cdcfb40567901096730ce5891e3eff"
+```
+
+利用Poison进行Elixir对象的序列化，只需要在文件的开头引入即可。
+
+```elixir
+Mix.install([
+  {:poison, "~> 3.1"}
+])
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+## 0x01 创建区块
+
+一个基本的block格式如下：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  :index => 0,
+  :timestamp => "",
+  :name => "",
+  :previous_hash => "",
+  :current_transactions => []
+}
+```
+
+* index：当前区块的索引
+* timestamp：生成区块的时间
+* name：区块的名字
+* previous_hash：上一个区块的hash
+* current_transactions：当前区块的交易
+
+```elixir
+Mix.install([
+  {:poison, "~> 3.1"}
+])
+
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: []
+
+  def new_block(c, name) do
+    b = %{
+      :index => length(c.chain),
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => name,
+      :previous_hash => c |> last_block() |> hash(),
+      :current_transactions => c.current_transactions
+    }
+
+    %{c | chain: c.chain ++ [b], current_transactions: []}
+  end
+
+  def zero() do
+    b = %{
+      :index => 0,
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => "ZERO",
+      :previous_hash => "",
+      :current_transactions => []
+    }
+
+    %Blockchain{
+      chain: [b],
+      current_transactions: []
+    }
+  end
+
+  def last_block(c) do
+    c.chain |> Enum.reverse() |> hd()
+  end
+
+  def hash(block) do
+    value = block |> Poison.encode!()
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 14, ...>>, {:hash, 1}}
+```
+
+创世区块
+
+```elixir
+zero = Blockchain.zero()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 07:48:09.958088]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+更多区块
+
+```elixir
+zero |> Blockchain.new_block("first") |> Blockchain.new_block("second")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 07:48:09.958088]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "9cb6907b4d95a7e09976cc34d5cca78d5c0c75e106816b7570e124f8938f3018",
+      timestamp: ~N[2022-03-26 07:48:09.962026]
+    },
+    %{
+      current_transactions: [],
+      index: 2,
+      name: "second",
+      previous_hash: "72ad4f1c33827b5e017796a5482916f903aabf9df34f60872797fd7de2788072",
+      timestamp: ~N[2022-03-26 07:48:09.962140]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+## 0x02 实现交易
+
+一个交易的格式是这样的：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  :sender => sender,
+  :recipient => recipient,
+  :amount => amount
+}
+```
+
+```elixir
+Mix.install([
+  {:poison, "~> 3.1"}
+])
+
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: []
+
+  def new_block(c, name) do
+    b = %{
+      :index => length(c.chain),
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => name,
+      :previous_hash => c |> last_block() |> hash(),
+      :current_transactions => c.current_transactions
+    }
+
+    %{c | chain: c.chain ++ [b], current_transactions: []}
+  end
+
+  def zero() do
+    b = %{
+      :index => 0,
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => "ZERO",
+      :previous_hash => "",
+      :current_transactions => []
+    }
+
+    %Blockchain{
+      chain: [b],
+      current_transactions: []
+    }
+  end
+
+  def new_transaction(c, sender, recipient, amount) do
+    tx = %{
+      :sender => sender,
+      :recipient => recipient,
+      :amount => amount
+    }
+
+    %Blockchain{c | current_transactions: c.current_transactions ++ [tx]}
+  end
+
+  def last_block(c) do
+    c.chain |> Enum.reverse() |> hd()
+  end
+
+  def hash(block) do
+    value = block |> Poison.encode!()
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 16, ...>>, {:hash, 1}}
+```
+
+创世区块
+
+```elixir
+zero = Blockchain.zero()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 07:48:10.014951]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+执行几个交易，并打包到新区块
+
+```elixir
+zero
+|> Blockchain.new_transaction("alice", "bob", 100)
+|> Blockchain.new_transaction("alice", "bob", 20)
+|> Blockchain.new_block("first")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 07:48:10.014951]
+    },
+    %{
+      current_transactions: [
+        %{amount: 100, recipient: "bob", sender: "alice"},
+        %{amount: 20, recipient: "bob", sender: "alice"}
+      ],
+      index: 1,
+      name: "first",
+      previous_hash: "329bd5c283dfdfd7cd6538cc32ae815886335dea18766f95edc99acce9c333da",
+      timestamp: ~N[2022-03-26 07:48:10.018769]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+可以看到交易已经在 first 区块中了。
+
+## 0x03 工作量证明PoW
+
+```elixir
+defmodule Pow do
+  def work(value, nonce, count, difficulty) do
+    case String.starts_with?(value, difficulty) do
+      true ->
+        IO.puts(value)
+        IO.puts("nonce: #{nonce}, scan times: #{count}")
+
+      _ ->
+        digest("#{value}{nonce}") |> work(nonce + 1, count + 1, difficulty)
+    end
+  end
+
+  def digest(value) do
+    IO.write("\rhash: #{value}")
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Pow, <<70, 79, 82, 49, 0, 0, 9, ...>>, {:digest, 1}}
+```
+
+```elixir
+Pow.work("Fenix", 0, 0, "0000")
+Pow.work("Fenix", 0, 0, "00000")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+hash: 4a63e7904c072195d86fb10af08f0b04e1a23b6ce4dd4201b268d3a23143d8ad{nonce}000075a4039f1ced998f266a88e85282724bbd9c21d8fcc13f49cf605487a750
+nonce: 19327, scan times: 19327
+hash: f4fbf8c27310494b8c7967371464363740dbbd2b2432e2e280f23e7df0638ca6{nonce}000005e60602f672df1a3b18fe027179cdc0f9918fc7529084bc4ddcb02ec6b6
+nonce: 618789, scan times: 618789
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+## 0x04 终态
+
+接下来为我们的区块链添加工作量证明。
+
+```elixir
+Mix.install([
+  {:poison, "~> 3.1"}
+])
+
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: [], last_nonce: 0
+
+  def new_block(c, name, nonce) do
+    if valid_proof?(c.last_nonce, nonce) do
+      b = %{
+        :index => length(c.chain),
+        :timestamp => NaiveDateTime.utc_now(),
+        :name => name,
+        :previous_hash => c |> last_block() |> hash(),
+        :current_transactions => c.current_transactions
+      }
+
+      %{c | chain: c.chain ++ [b], current_transactions: [], last_nonce: nonce}
+    else
+      IO.puts("\nnonce: #{nonce} is invalid")
+    end
+  end
+
+  def zero() do
+    b = %{
+      :index => 0,
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => "ZERO",
+      :previous_hash => "",
+      :current_transactions => []
+    }
+
+    %Blockchain{
+      chain: [b],
+      current_transactions: [],
+      last_nonce: 0
+    }
+  end
+
+  def new_transaction(c, sender, recipient, amount) do
+    tx = %{
+      :sender => sender,
+      :recipient => recipient,
+      :amount => amount
+    }
+
+    %Blockchain{c | current_transactions: c.current_transactions ++ [tx]}
+  end
+
+  def last_block(c) do
+    c.chain |> Enum.reverse() |> hd()
+  end
+
+  def hash(block) do
+    value = block |> Poison.encode!()
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+
+  def proof_of_work(last_nonce, nonce \\ 0) do
+    case valid_proof?(last_nonce, nonce) do
+      true ->
+        nonce
+
+      _ ->
+        proof_of_work(last_nonce, nonce + 1)
+    end
+  end
+
+  def valid_proof?(last_nonce, nonce, difficulty \\ "0000") do
+    guess = "#{last_nonce}#{nonce}"
+
+    guess_hash =
+      :crypto.hash(:sha256, guess)
+      |> Base.encode16()
+      |> String.downcase()
+
+    IO.write("\rdifficulty: #{difficulty}, attempt: #{nonce}, hash: #{guess_hash}")
+    guess_hash |> String.starts_with?(difficulty)
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 24, ...>>, {:valid_proof?, 3}}
+```
+
+创世区块
+
+```elixir
+zero = Blockchain.zero()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 07:56:01.008773]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 0
+}
+```
+
+如果没有计算好nonce，则会报错。比如我这里给了个nonce是333。
+
+```elixir
+first = zero |> Blockchain.new_block("first", 333)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 333, hash: e73a36f8264731f64049b86564604e671d4bb1cfc0f6ab26803a5ad18040fee2
+nonce: 333 is invalid
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+我们去计算nonce:
+
+```elixir
+nonce = Blockchain.proof_of_work(zero.last_nonce)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a1175
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+69732
+```
+
+利用计算好的nonce去生成区块：
+
+```elixir
+first = zero |> Blockchain.new_block("first", nonce)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a1175
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 07:56:01.008773]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "04d365f35e2d35b8891cb1bc97b84d2dd6f8faf4a48c931b35d3392ba85f38e8",
+      timestamp: ~N[2022-03-26 07:57:58.014195]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 69732
+}
+```
+
+大工告成！
+
+完整执行如下步骤：
+
+* 构建创世区块
+* 计算出来nonce，创建第一个区块
+* 计算新的nonce
+* 执行几个交易，再生成新的区块
+
+```elixir
+zero = Blockchain.zero()
+
+nonce = Blockchain.proof_of_work(zero.last_nonce)
+IO.inspect(nonce)
+first = zero |> Blockchain.new_block("first", nonce)
+IO.inspect(first)
+
+nonce = Blockchain.proof_of_work(first.last_nonce)
+
+second =
+  first
+  |> Blockchain.new_transaction("alice", "bob", 100)
+  |> Blockchain.new_block("second", nonce)
+
+IO.inspect(second)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a117569732
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a1175%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 08:00:30.518682]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "227d927f0ca6443118aefef5394fcc7a9252af987fb2420474531980c0179ca3",
+      timestamp: ~N[2022-03-26 08:00:31.518371]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 69732
+}
+difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59883f915fe1030f05c16a5492%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 08:00:30.518682]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "227d927f0ca6443118aefef5394fcc7a9252af987fb2420474531980c0179ca3",
+      timestamp: ~N[2022-03-26 08:00:31.518371]
+    },
+    %{
+      current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
+      index: 2,
+      name: "second",
+      previous_hash: "5a8232a6e88212170f377169a97e7bc6d0bc21a3ff2c7d6908c7884a1d9d9443",
+      timestamp: ~N[2022-03-26 08:00:31.862765]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 23263
+}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-26 08:00:30.518682]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "227d927f0ca6443118aefef5394fcc7a9252af987fb2420474531980c0179ca3",
+      timestamp: ~N[2022-03-26 08:00:31.518371]
+    },
+    %{
+      current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
+      index: 2,
+      name: "second",
+      previous_hash: "5a8232a6e88212170f377169a97e7bc6d0bc21a3ff2c7d6908c7884a1d9d9443",
+      timestamp: ~N[2022-03-26 08:00:31.862765]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 23263
+}
+```
