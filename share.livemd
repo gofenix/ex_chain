@@ -1,0 +1,1082 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# Elixir实现简易区块链（分享版）
+
+## Elixir & Livebook
+
+### Elixir
+
+> Elixir is a dynamic, functional language for building scalable and maintainable applications.
+> 一种用于构建可伸缩、可维护应用的动态、函数式编程语言。
+> https://elixir-lang.org/
+
+相比于大家熟悉的面向对象编程(OOP)，函数式编程(FP)更强调程序 执行的结果而不是过程，它倡导利用若干简单的执行单元渐进地、逐层地完成运算，
+而不是设计一个复杂的执行过程。
+每个函数的执行结果只依赖于函数的参数，而不受其他数据的影响。严格的函数式语言要求函数必须无副作用。
+
+Elixir 的函数式编程特性包括数据不可变、模式匹配、管道等。
+
+* 数据不可变要求每次都通过创建新的数据来修改已有的数据。正是这一点保证了传递的参数是完全不可变的。
+* 模式匹配让我们用新的视角去看待赋值和判断，它不仅能对数据结构进行解构，还能够根据传递的参数对方法逻辑进行拆分，使得代码更简洁。
+* 管道是一种类似链式调用的语法糖，它可以让数据的变化和流动变得更清晰。
+
+Elixir 的这些语法特性是非常直观的，初学者可以非常轻松地入门 并写出清晰且易于维护的代码。
+
+Elixir 是一种强动态类型语言，它的数据类型都是在运行时才推断出来的。
+你也可以使用类型规格(typespec)在编译期间声明函数的签名和自定义类型，使用类型规格声明函数后，工具就会对源代码进行静态的类型检查，提前发现类型不一致的问题。
+这样做的好处是，你既可以获得静态类型语言的大部分优势，又不会失去动态类型所带来的灵活性。
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Livebook
+
+Livebook 是一个用于为Elixir编写交互式和协作性的代码笔记本。
+可以类比Python的jupyter notebook。
+
+https://livebook.dev/
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Mix.install/2
+
+我们可以通过`Mix.install/2`来安装依赖。
+
+<!-- livebook:{"break_markdown":true} -->
+
+:force - if true, removes install cache. This is useful when you want to update your dependencies or your install got into an inconsistent state (Default: false)
+
+:verbose - if true, prints additional debugging information (Default: false)
+
+```elixir
+Mix.install(
+  [:poison]
+  # force: true,
+  # verbose: true
+)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+## Blockchain介绍
+
+### 区块
+
+想要了解区块到底是什么，最简单快捷的办法就是分析它的数据结构，以 Bitcoin 中的区块 #514095 为例：
+
+```json
+{
+　　"hash":"00000000000000000018b0a6ae560fa33c469b6528bc9e0fb0c669319a186c33",
+　　"confirmations":1009,
+　　"strippedsize":956228,
+　　"size":1112639,
+　　"weight":3981323,
+　　"height":514095,
+　　"version":536870912,
+　　"versionHex":"20000000",
+　　"merkleroot":"5f8f8e053fd4c0c3175c10ac5189c15e6ba218909319850936fe54934dcbfeac",
+　　"tx":[
+　　  // ...
+　　],
+　　"time":1521380124,
+　　"mediantime":1521377506,
+　　"nonce":3001236454,
+　　"bits":"17514a49",
+　　"difficulty":3462542391191.563,
+　　"chainwork":"0000000000000000000000000000000000000000014d2b41a340e60b72292430",
+　　"previousblockhash":"000000000000000000481ab128418847dc25db4dafec464baa5a33e66490990b",
+　　"nextblockhash":"0000000000000000000c74966205813839ad1c6d55d75f95c9c5f821db9c3510"
+}
+
+```
+
+在这个 Block 的结构体中，previousblockhash 和 merkleroot 是两个最重要的字段；
+前者是一个哈希指针，它其实是前一个 Block 的哈希，通过 previousblockhash 我们能递归地找到全部的 Block，也就是整条主链;
+后者是一个 Merkle 树的根，Merkle 树中包含整个 Block 中的全部交易，通过保存 merkleroot，我们可以保证当前 Block 中任意交易都不会被修改。
+
+Ethereum 的区块链模型虽然与 Bitcoin 有非常大的不同，但是它的 Block 结构中也有着类似的信息：
+
+```json
+{
+   "jsonrpc":"2.0",
+   "result":{
+      "author":"0x00d8ae40d9a06d0e7a2877b62e32eb959afbe16d",
+      "difficulty":"0x785042b0",
+      "extraData":"0x414952412f7630",
+      "gasLimit":"0x47b784",
+      "gasUsed":"0x44218a",
+      "hash":"0x4de91e4af8d135e061d50ddd6d0d6f4119cd0f7062ebe8ff2d79c5af0e8344b9",
+      "logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "miner":"0x00d8ae40d9a06d0e7a2877b62e32eb959afbe16d",
+      "mixHash":"0xb8155224974967443d8b83e484402fb6e1e18ff69a8fc5acdda32f2bcc6dd443",
+      "nonce":"0xad14fb6803147c7c",
+      "number":"0x2000f1",
+      "parentHash":"0x31919e2bf29306778f50bbc376bd490a7d056ddfd5b1f615752e79f32c7f1a38",
+      "receiptsRoot":"0xa2a7af5e3b9e1bbb6252ba82a09302321b8f0eea7ec8e3bb977401e4f473e672",
+      "sealFields":[
+         "0xa0b8155224974967443d8b83e484402fb6e1e18ff69a8fc5acdda32f2bcc6dd443",
+         "0x88ad14fb6803147c7c"
+      ],
+      "sha3Uncles":"0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+      "size":"0x276",
+      "stateRoot":"0x87e7e54cf229003014f453d64f0344e2ba4fc7ee3b95c7dd2642cca389fa1efe",
+      "timestamp":"0x5a10968a",
+      "totalDifficulty":"0x1804de0c47ffe1",
+      "transactions":[...],
+      "transactionsRoot":"0xc2091b032961ca23cf8323ea827e8956fe6dda9e68d75bcfaa8b910035397e35",
+      "uncles":[]
+   },
+   "id":1
+}
+```
+
+parentHash 和 transactionsRoot 分别对应着 Bitcoin 中 previousblockhash 和 merkleroot，
+这两者在整个区块链网络中是非常重要的。
+
+### 哈希指针
+
+Block 结构体中的哈希指针在区块链中有两个作用，它不仅能够连接不同的区块，还能够对 Block 进行验证，保证 Block 中的数据不会被其他恶意节点篡改。
+
+![](https://raw.githubusercontent.com/zhenfeng-zhu/pic-go/main/202203291025105.png)
+
+除了第一个 Block，每一个 Block 中的 prev_hash 都是前一个 Block 的哈希，
+如果某一个节点想要修改主链上 Block 的交易，就会改变当前 Block 的哈希，
+后面的 Block 就没有办法通过 prev_hash 找到前面的链，
+所以当前节点篡改交易的行为就会被其他节点发现。
+
+### Merkle Tree
+
+另一个字段 merkleroot 其实就是一个 Merkle 树 的根节点，它其实是一种使用哈希指针连接的数据结构；虽然 Merkle 树有叶节点和非叶节点，
+但是它只有叶节点会存储数据，所有的非叶结点都是用于验证数据完整性的哈希。
+
+![](https://raw.githubusercontent.com/zhenfeng-zhu/pic-go/main/202203291027119.png)
+
+每一个 Block 中的全部交易都是存储在这个 Merkle 树中并将 merkleroot 保存在 Block 的结构体中，
+保证当前 Block 中任意交易的篡改都能被立刻发现。
+
+### 小结
+
+prev_hash 和 merkleroot 分别通过『指针』的方式保证所有的 Block 和交易都是连接起来的，最终保证 Block 和交易不会被恶意节点或攻击者篡改，几乎全部的区块链项目都会使用类似方式连接不同的 Block 和交易，
+这可以说是区块链项目的基础设施和标配了。
+
+> 以上内容来自 [Draveness博客](https://draveness.me/utxo-account-models/)
+
+## 创建区块
+
+### 区块
+
+一个基本的block格式如下：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  :index => 0,
+  :timestamp => "",
+  :name => "",
+  :previous_hash => "",
+  :current_transactions => []
+}
+```
+
+* index：当前区块的索引
+* timestamp：生成区块的时间
+* name：区块的名字
+* previous_hash：上一个区块的hash
+* current_transactions：当前区块的交易
+
+在这一点上，一个 区块链 的概念应该是明显的：每个新块都包含在其内的前一个块的散列。
+
+这是至关重要的，因为这是 区块链 不可改变的原因：
+如果攻击者损坏 区块链 中较早的块，则所有后续块将包含不正确的哈希值。
+这有道理吗？如果你还没有想通，花点时间仔细思考一下。
+
+这是区块链背后的核心理念。
+
+<!-- livebook:{"break_markdown":true} -->
+
+程序基本结构如下：
+
+```elixir
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: []
+
+  def new_block(c, name) do
+  end
+
+  def zero() do
+  end
+
+  def last_block(c) do
+  end
+
+  def hash(block) do
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+warning: variable "c" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  share.livemd#cell:4: Blockchain.new_block/2
+
+warning: variable "name" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  share.livemd#cell:4: Blockchain.new_block/2
+
+warning: variable "c" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  share.livemd#cell:12: Blockchain.last_block/1
+
+warning: variable "block" is unused (if the variable is not meant to be used, prefix it with an underscore)
+  share.livemd#cell:16: Blockchain.hash/1
+
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 9, ...>>, {:hash, 1}}
+```
+
+### 补全程序
+
+<!-- livebook:{"break_markdown":true} -->
+
+Elixir的hash要用`:crypto.hash`函数来做，比如
+
+```elixir
+value = "fenix"
+:crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"b170f30d201da73b7637e94391f22a4642f8c396f9c1c9f8b2799919ced46d78"
+```
+
+补全new_block函数：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+def new_block(c, name) do
+    b = %{
+      :index => length(c.chain),
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => name,
+      :previous_hash => c |> last_block() |> hash(),
+      :current_transactions => c.current_transactions
+    }
+
+    %{c | chain: c.chain ++ [b], current_transactions: []}
+end
+```
+
+* 计算上一个区块的hash，写入previous_hash中
+* %{c | chain: c.chain ++ [b], current_transactions: []} 是一个语法糖，把当前区块 append 到链上。
+
+<!-- livebook:{"break_markdown":true} -->
+
+完整的程序如下：
+
+```elixir
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: []
+
+  def new_block(c, name) do
+    b = %{
+      :index => length(c.chain),
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => name,
+      :previous_hash => c |> last_block() |> hash(),
+      :current_transactions => c.current_transactions
+    }
+
+    %{c | chain: c.chain ++ [b], current_transactions: []}
+  end
+
+  def zero() do
+    b = %{
+      :index => 0,
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => "ZERO",
+      :previous_hash => "",
+      :current_transactions => []
+    }
+
+    %Blockchain{
+      chain: [b],
+      current_transactions: []
+    }
+  end
+
+  def last_block(c) do
+    c.chain |> Enum.reverse() |> hd()
+  end
+
+  def hash(block) do
+    value = block |> Poison.encode!()
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 14, ...>>, {:hash, 1}}
+```
+
+### 试一试，生成新的区块
+
+<!-- livebook:{"break_markdown":true} -->
+
+创世区块
+
+```elixir
+zero = Blockchain.zero()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 03:52:41.984864]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+创建更多区块
+
+```elixir
+zero
+|> Blockchain.new_block("first")
+|> Blockchain.new_block("second")
+|> Blockchain.new_block("third")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 03:52:41.984864]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "9539415b7d502d4eddd5e998b8c4def352b512a9ced9481ed0ba8ea3994e5b10",
+      timestamp: ~N[2022-03-29 03:52:41.988072]
+    },
+    %{
+      current_transactions: [],
+      index: 2,
+      name: "second",
+      previous_hash: "fb356ad6b9f156807cf70da7d4e309cc24cb8b7203a3f251fb112c1bf6051fc7",
+      timestamp: ~N[2022-03-29 03:52:41.988112]
+    },
+    %{
+      current_transactions: [],
+      index: 3,
+      name: "third",
+      previous_hash: "5e31700feefb3980eb374e1e178e57bd69f70e720ce428477490f12b3790b9e8",
+      timestamp: ~N[2022-03-29 03:52:41.988135]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+## 实现交易
+
+区块链中的「交易」一词很具有迷惑性，似乎代表着一定涉及金钱的转换。
+
+实际上，我们应该将交易抽象为如下的抽象模型：
+
+```json
+{
+  from: from_addr,
+  to: to_addr,
+  amount: amount, # 仅公链有效
+  gas: gas, # 手续费
+  op: operation # 附带的操作
+}
+```
+
+公链中，每笔交易均会包含amount（amount可能是0）与gas。
+有的交易是单纯的用户间转账，有的交易的关键点在于operation。
+这个时候，to通常是一个合约地址，operation会告诉「区块链计算机」要做什么——例如在区块链数据库里存储一个值，例如在区块链上进行某些计算，这时我们就将区块链看成是一台「分布式计算机」。
+
+在联盟链中，amount这个概念被废弃，同时，也没有了原生代币转账的交易（注意，ERC20这种基于智能合约的代币是支持的，不过通常被称为积分）。
+但是，gas依然存在，用来衡量对计算资源的消耗量。
+
+<!-- livebook:{"break_markdown":true} -->
+
+在Elixir中一个交易的格式可以被这样抽象：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+%{
+  :sender => sender,
+  :recipient => recipient,
+  :amount => amount
+}
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+补全new_transaction函数：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+def new_transaction(c, sender, recipient, amount) do
+    tx = %{
+      :sender => sender,
+      :recipient => recipient,
+      :amount => amount
+    }
+
+    %Blockchain{c | current_transactions: c.current_transactions ++ [tx]}
+end
+```
+
+>
+
+<!-- livebook:{"break_markdown":true} -->
+
+我们包含交易的完整代码如下：
+
+```elixir
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: []
+
+  def new_block(c, name) do
+    b = %{
+      :index => length(c.chain),
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => name,
+      :previous_hash => c |> last_block() |> hash(),
+      :current_transactions => c.current_transactions
+    }
+
+    %{c | chain: c.chain ++ [b], current_transactions: []}
+  end
+
+  def zero() do
+    b = %{
+      :index => 0,
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => "ZERO",
+      :previous_hash => "",
+      :current_transactions => []
+    }
+
+    %Blockchain{
+      chain: [b],
+      current_transactions: []
+    }
+  end
+
+  def new_transaction(c, sender, recipient, amount) do
+    tx = %{
+      :sender => sender,
+      :recipient => recipient,
+      :amount => amount
+    }
+
+    %Blockchain{c | current_transactions: c.current_transactions ++ [tx]}
+  end
+
+  def last_block(c) do
+    c.chain |> Enum.reverse() |> hd()
+  end
+
+  def hash(block) do
+    value = block |> Poison.encode!()
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 16, ...>>, {:hash, 1}}
+```
+
+### 试一试，创建交易！
+
+<!-- livebook:{"break_markdown":true} -->
+
+创世区块
+
+```elixir
+zero = Blockchain.zero()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 03:52:42.022482]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+执行几个交易，并打包到新区块
+
+```elixir
+zero
+|> Blockchain.new_transaction("alice", "bob", 100)
+|> Blockchain.new_transaction("alice", "bob", 20)
+|> Blockchain.new_block("first")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 03:52:42.022482]
+    },
+    %{
+      current_transactions: [
+        %{amount: 100, recipient: "bob", sender: "alice"},
+        %{amount: 20, recipient: "bob", sender: "alice"}
+      ],
+      index: 1,
+      name: "first",
+      previous_hash: "4710c15877c199f1041c0a1011d2607e30945729d4b0db1a214dc330fb2faccd",
+      timestamp: ~N[2022-03-29 03:52:44.579954]
+    }
+  ],
+  current_transactions: []
+}
+```
+
+可以看到交易已经在 first 区块中了。
+
+## 工作量证明PoW
+
+### 比特币白皮书
+
+To implement a distributed timestamp server on a peer-to-peer basis, we will need to use a proof-of-work system similar to Adam Back's Hashcash**[6]**, rather than newspaper or Usenet posts. The proof-of-work involves scanning for a value that when hashed, such as with SHA-256, the hash begins with a number of zero bits. The average work required is exponential in the number of zero bits required and can be verified by executing a single hash.
+
+为了实现一个基于点对点的分布式时间戳服务器，我们需要使用类似亚当·伯克的哈希现金**[6]**那样的一个工作证明系统，而不是报纸或者新闻组帖子那样的东西。所谓的工作证明，就是去寻找一个数值；这个数值要满足以下条件：为它提取散列数值之后 —— 例如使用 SHA-256 计算散列数值 —— 这个散列数值必须以一定数量的 0 开头。每增加一个 0 的要求，将使得工作量指数级增加，并且，这个工作量的验证却只需通过计算一个哈希。
+
+For our timestamp network, we implement the proof-of-work by incrementing a nonce in the block until a value is found that gives the block's hash the required zero bits. Once the CPU effort has been expended to make it satisfy the proof-of-work, the block cannot be changed without redoing the work. As later blocks are chained after it, the work to change the block would include redoing all the blocks after it.
+
+在我们的时间戳网络中，我们是这样实现工作证明的：不断在区块之中增加一个随机数（Nonce），直到一个满足条件的数值被找到；这个条件就是，这个区块的哈希以指定数量的 0 开头。一旦 CPU 的耗费算力所获的的结果满足工作证明，那么这个区块将不再能被更改，除非重新完成之前的所有工作量。随着新的区块不断被添加进来，改变当前区块即意味着说要重新完成所有其后区块的工作。
+
+![](https://raw.githubusercontent.com/zhenfeng-zhu/pic-go/main/202203291159361.png)
+
+The proof-of-work also solves the problem of determining representation in majority decision making. If the majority were based on one-IP-address-one-vote, it could be subverted by anyone able to allocate many IPs. Proof-of-work is essentially one-CPU-one-vote. The majority decision is represented by the longest chain, which has the greatest proof-of-work effort invested in it. If a majority of CPU power is controlled by honest nodes, the honest chain will grow the fastest and outpace any competing chains. To modify a past block, an attacker would have to redo the proof-of-work of the block and all blocks after it and then catch up with and surpass the work of the honest nodes. We will show later that the probability of a slower attacker catching up diminishes exponentially as subsequent blocks are added.
+
+工作证明同时解决了如何决定谁能代表大多数做决定的问题。如果所谓的“大多数”是基于“一个 IP 地址一票”的方式决定的话，那么任何一个可以搞定很多 IP 地址的人就可以被认为是“大多数”。工作证明本质上来看，是“一个 CPU（可以理解为一份算力） 一票”。所谓的“大多数决定”是由最长链所代表的，因为被投入最多工作的链就是它。如果大多数 CPU 算力被诚实的节点所控制，那么诚实链成长最为迅速，其速度会远超其他竞争链。为了更改一个已经产生的区块，攻击者将不得不重新完成那个区块以及所有其后区块的的工作证明，而后还要追上并超过诚实节点的工作。后文展示为什么一个被拖延了的攻击者能够追上的可能性将随着区块的不断增加而指数级降低。
+
+To compensate for increasing hardware speed and varying interest in running nodes over time, the proof-of-work difficulty is determined by a moving average targeting an average number of blocks per hour. If they're generated too fast, the difficulty increases.
+
+为了应对硬件算力综合的不断增加，以及随着时间推进可能产生的节点参与数量变化，工作证明难度由此决定：基于平均每小时产生的区块数量的一个移动平均值。如果区块生成得过快，那么难度将会增加。
+
+### 重要概念解析
+
+* Nonce
+
+![](https://raw.githubusercontent.com/zhenfeng-zhu/pic-go/main/202203291200313.png)
+
+比特币区块中的 nonce 是一个 32 位（4 字节）的字段。有了这个字段，区块的哈希值（一串 16 进制数字）小于或等于目前网络的目标，也即表示矿工实现了某个工作量。这个字段和其它字段是独立的，也即不会影响到其它的字段。
+
+需要注意的是，Nonce 是一个变化的值。可以把它当成比特币系统的一个**「操控杆」**。正是有了这个操控杆，不管有多少算力投入了这个系统，也能保证平均十分钟出一个块。
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Go语言版本
+
+```go
+package main
+
+import (
+    "crypto/sha256"
+    "encoding/hex"
+    "fmt"
+    "strconv"
+    "strings"
+)
+
+func main() {
+    pow("0000")
+}
+
+func pow(diff string) {
+    baseStr := "fenix"
+    nonce := 0
+    count := 0
+    for {
+        targetStr := baseStr + strconv.Itoa(nonce)
+        h := sha256.New()
+        h.Write([]byte(targetStr))
+        powHash := hex.EncodeToString(h.Sum(nil))
+        fmt.Printf("\r%s", powHash)
+        count += 1
+        if strings.HasPrefix(string(powHash), diff) {
+            fmt.Println()
+            fmt.Println("nonce: ", nonce, "scan times: ", count)
+            break
+        }
+        nonce += 1
+    }
+}
+
+```
+
+### rust版本
+
+```rust
+use sha256::digest;
+
+fn main() {
+    pow(String::from("0000"));
+}
+
+fn pow(diff: String) {
+    println!("{}", diff);
+    let mut count = 0;
+    let mut nonce = 0;
+    let base_str = String::from("fenix");
+    loop {
+        count += 1;
+        let target_str = base_str.clone() + &nonce.to_string();
+        let pow_hash = digest(target_str);
+        print!("\r{}", pow_hash);
+        if pow_hash.starts_with(&diff) {
+            println!("");
+            println!("nonce: {}, scan times: {}", nonce, count);
+            break;
+        }
+        nonce += 1;
+    }
+}
+```
+
+### python版本
+
+```python
+import hashlib
+
+def main(diff):
+    base_str = "fenix"
+    nonce = 10000
+    count = 0
+    while True:
+        target_str = base_str + str(nonce)
+        pow_hash = hashlib.sha256(target_str).hexdigest()
+        count = count + 1
+        if pow_hash.startswith(diff):
+            print(pow_hash)
+            print("nonce: {}, scan times: {}".format(nonce, count))
+            break
+        nonce = nonce + 1
+
+diff = "0000"
+main(diff)
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+可以看出来，主流编程语言去实现的时候，基本都会选择循环的方式。
+
+Elixir 的变量是不可变的，常规的循环方式是不可以的，我们就得用递归的思路来做，如下：
+
+```elixir
+defmodule Pow do
+  def work(value, nonce, count, difficulty) do
+    case String.starts_with?(value, difficulty) do
+      true ->
+        IO.puts(value)
+        IO.puts("nonce: #{nonce}, scan times: #{count}")
+
+      _ ->
+        digest("#{value}{nonce}") |> work(nonce + 1, count + 1, difficulty)
+    end
+  end
+
+  def digest(value) do
+    IO.write("\rhash: #{value}")
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Pow, <<70, 79, 82, 49, 0, 0, 10, ...>>, {:digest, 1}}
+```
+
+```elixir
+Pow.work("Fenix", 0, 0, "0000")
+Pow.work("Fenix", 0, 0, "00000")
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+hash: 4a63e7904c072195d86fb10af08f0b04e1a23b6ce4dd4201b268d3a23143d8ad{nonce}000075a4039f1ced998f266a88e85282724bbd9c21d8fcc13f49cf605487a750
+nonce: 19327, scan times: 19327
+hash: f4fbf8c27310494b8c7967371464363740dbbd2b2432e2e280f23e7df0638ca6{nonce}000005e60602f672df1a3b18fe027179cdc0f9918fc7529084bc4ddcb02ec6b6
+nonce: 618789, scan times: 618789
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+难度越大，计算的次数越多。
+
+## 终态
+
+接下来为我们的区块链添加工作量证明，整个完整的程序如下：
+
+```elixir
+defmodule Blockchain do
+  defstruct chain: [], current_transactions: [], last_nonce: 0
+
+  def new_block(c, name, nonce) do
+    if valid_proof?(c.last_nonce, nonce) do
+      b = %{
+        :index => length(c.chain),
+        :timestamp => NaiveDateTime.utc_now(),
+        :name => name,
+        :previous_hash => c |> last_block() |> hash(),
+        :current_transactions => c.current_transactions
+      }
+
+      %{c | chain: c.chain ++ [b], current_transactions: [], last_nonce: nonce}
+    else
+      IO.puts("\nnonce: #{nonce} is invalid")
+    end
+  end
+
+  def zero() do
+    b = %{
+      :index => 0,
+      :timestamp => NaiveDateTime.utc_now(),
+      :name => "ZERO",
+      :previous_hash => "",
+      :current_transactions => []
+    }
+
+    %Blockchain{
+      chain: [b],
+      current_transactions: [],
+      last_nonce: 0
+    }
+  end
+
+  def new_transaction(c, sender, recipient, amount) do
+    tx = %{
+      :sender => sender,
+      :recipient => recipient,
+      :amount => amount
+    }
+
+    %Blockchain{c | current_transactions: c.current_transactions ++ [tx]}
+  end
+
+  def last_block(c) do
+    c.chain |> Enum.reverse() |> hd()
+  end
+
+  def hash(block) do
+    value = block |> Poison.encode!()
+    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+  end
+
+  def proof_of_work(last_nonce, nonce \\ 0) do
+    case valid_proof?(last_nonce, nonce) do
+      true ->
+        nonce
+
+      _ ->
+        proof_of_work(last_nonce, nonce + 1)
+    end
+  end
+
+  def valid_proof?(last_nonce, nonce, difficulty \\ "0000") do
+    guess = "#{last_nonce}#{nonce}"
+
+    guess_hash =
+      :crypto.hash(:sha256, guess)
+      |> Base.encode16()
+      |> String.downcase()
+
+    IO.write("\rdifficulty: #{difficulty}, attempt: #{nonce}, hash: #{guess_hash}")
+    guess_hash |> String.starts_with?(difficulty)
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Blockchain, <<70, 79, 82, 49, 0, 0, 24, ...>>, {:valid_proof?, 3}}
+```
+
+创世区块
+
+```elixir
+zero = Blockchain.zero()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 04:08:24.219740]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 0
+}
+```
+
+如果你想要生成一个新的区块，就必须去计算nonce，用算出的来的nonce去创建block。
+
+如果没有计算好nonce，则会报错。比如我这里随便给了个nonce是333，我们执行一下：
+
+```elixir
+first = zero |> Blockchain.new_block("first", 333)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 333, hash: e73a36f8264731f64049b86564604e671d4bb1cfc0f6ab26803a5ad18040fee2
+nonce: 333 is invalid
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+调用proof_of_work去计算nonce:
+
+```elixir
+nonce = Blockchain.proof_of_work(zero.last_nonce)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a1175
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+69732
+```
+
+利用计算好的nonce去生成区块：
+
+```elixir
+first = zero |> Blockchain.new_block("first", nonce)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a1175
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 04:08:24.219740]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "98a230c70b6529c69bb0475561c8f0ece30c5b89e59e39a6ecc5972c0032bd80",
+      timestamp: ~N[2022-03-29 04:11:08.177860]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 69732
+}
+```
+
+大工告成！
+
+完整执行如下步骤：
+
+* 构建创世区块
+* 计算出来nonce，创建第一个区块
+* 计算新的nonce
+* 执行几个交易，再生成新的区块
+
+```elixir
+zero = Blockchain.zero()
+
+nonce = Blockchain.proof_of_work(zero.last_nonce)
+IO.inspect(nonce)
+first = zero |> Blockchain.new_block("first", nonce)
+IO.inspect(first)
+
+nonce = Blockchain.proof_of_work(first.last_nonce)
+
+second =
+  first
+  |> Blockchain.new_transaction("alice", "bob", 100)
+  |> Blockchain.new_block("second", nonce)
+
+IO.inspect(second)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a117569732
+difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b73a10f549bbaa6472e8a1175%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 04:11:20.130037]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "6ca063fa2dfd65f4a93f2e126a71dbf3895837d79671a9a91369d2931954e4c1",
+      timestamp: ~N[2022-03-29 04:11:20.781126]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 69732
+}
+difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59883f915fe1030f05c16a5492%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 04:11:20.130037]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "6ca063fa2dfd65f4a93f2e126a71dbf3895837d79671a9a91369d2931954e4c1",
+      timestamp: ~N[2022-03-29 04:11:20.781126]
+    },
+    %{
+      current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
+      index: 2,
+      name: "second",
+      previous_hash: "5a4b9b0e61bdc58a2c18dee51a92b6c31187e8cc0648cafc18472543d957f3dd",
+      timestamp: ~N[2022-03-29 04:11:21.016550]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 23263
+}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Blockchain{
+  chain: [
+    %{
+      current_transactions: [],
+      index: 0,
+      name: "ZERO",
+      previous_hash: "",
+      timestamp: ~N[2022-03-29 04:11:20.130037]
+    },
+    %{
+      current_transactions: [],
+      index: 1,
+      name: "first",
+      previous_hash: "6ca063fa2dfd65f4a93f2e126a71dbf3895837d79671a9a91369d2931954e4c1",
+      timestamp: ~N[2022-03-29 04:11:20.781126]
+    },
+    %{
+      current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
+      index: 2,
+      name: "second",
+      previous_hash: "5a4b9b0e61bdc58a2c18dee51a92b6c31187e8cc0648cafc18472543d957f3dd",
+      timestamp: ~N[2022-03-29 04:11:21.016550]
+    }
+  ],
+  current_transactions: [],
+  last_nonce: 23263
+}
+```
+
+## 贤者时间
+
+如今容器技术发展得如 火如荼，无服务计算(Serverless)方兴未艾，“以应用为中心”成为一种新的架构理念。
+从云原生生态的角度看，Docker、K8S、Serverless 等一系列基础设施都在以与语言无关的方式回答可伸缩和可维护的问题。
+反观 Elixir，开箱即用、完整的构建和发布工具链、面向高并发的 Actor 模型，以及构建大型可伸缩、支持热更新的 OTP 框架，都让它显得小而美。
+Elixir 本地开发和部署到云端的版本无差异，它从语言层面、原生工具层面就开始考虑这些问题，在业务逻辑和健壮应用之间没有脱节，不需要学额外的框架，更不需要熟悉复杂的第三方平台。
+
+掌握 Elixir 也许目前还不能给你的简历添彩，让你在职场获得更高的溢价，但学习 Elixir 可以让你以不同的视角去看待函数、可变性、并发、高可用。
+软件工程最大的挑战是，在持续满足业务复杂度的同时，保持工程的可维护性。 
+而 Elixir 给出了从语言层面出发的系统性解法。
+虽然这门语言尚未流行起来， 但这一点也不能掩盖它的优秀。
