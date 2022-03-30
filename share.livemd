@@ -1181,3 +1181,15 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
 <!-- livebook:{"break_markdown":true} -->
 
 最后，Why Elixir & Blockchain？ 确保Web3发生在Elixir！
+
+<!-- livebook:{"break_markdown":true} -->
+
+### 参考
+
+* 用 Python 创建一条 Pow 区块链
+  * 文字版：https://r8jmm3f9xe.feishu.cn/docs/doccnJ78y2G5KEXHObTnkpCrHwh
+  * 视频版：https://ke.qq.com/course/3616174?tuin=d34bd514&taid=12533264329158062
+* [UTXO 与账户余额模型](https://draveness.me/utxo-account-models/)
+* [极客时间：深入浅出区块链](https://time.geekbang.org/column/article/5963)
+* [elixir：灵丹妙药？or 徒有其名？](https://zhuanlan.zhihu.com/p/19968376)
+* ...
