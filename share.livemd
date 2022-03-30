@@ -2,29 +2,92 @@
 
 # Elixir实现简易区块链（分享版）
 
-## Elixir & Livebook
-
-### Elixir
+## Why Elixir
 
 > Elixir is a dynamic, functional language for building scalable and maintainable applications.
+> 
 > 一种用于构建可伸缩、可维护应用的动态、函数式编程语言。
+> 
 > https://elixir-lang.org/
 
-相比于大家熟悉的面向对象编程(OOP)，函数式编程(FP)更强调程序 执行的结果而不是过程，它倡导利用若干简单的执行单元渐进地、逐层地完成运算，
-而不是设计一个复杂的执行过程。
-每个函数的执行结果只依赖于函数的参数，而不受其他数据的影响。严格的函数式语言要求函数必须无副作用。
+#### 惊艳的语法
 
-Elixir 的函数式编程特性包括数据不可变、模式匹配、管道等。
+Elixir的语法在向Ruby致敬，同时透着Erlang和Prolog的灵气。
+任何语言语法的设计都和其创始人的偏好和目标分不开，Ken Thompson/Rob Pike的golang看上去很C，Jose Valim的Elixir自然就很Ruby。
+当然，植根于Erlang的Elixir，又有有很多自己的特点。
 
-* 数据不可变要求每次都通过创建新的数据来修改已有的数据。正是这一点保证了传递的参数是完全不可变的。
-* 模式匹配让我们用新的视角去看待赋值和判断，它不仅能对数据结构进行解构，还能够根据传递的参数对方法逻辑进行拆分，使得代码更简洁。
-* 管道是一种类似链式调用的语法糖，它可以让数据的变化和流动变得更清晰。
+最让人爱不释手的是pipe `|>`, 它让你把一层层的逆着你的思维的函数调用变成了更直观的表现，比如说我们常常这么写代码：
 
-Elixir 的这些语法特性是非常直观的，初学者可以非常轻松地入门 并写出清晰且易于维护的代码。
+<!-- livebook:{"force_markdown":true} -->
 
-Elixir 是一种强动态类型语言，它的数据类型都是在运行时才推断出来的。
-你也可以使用类型规格(typespec)在编译期间声明函数的签名和自定义类型，使用类型规格声明函数后，工具就会对源代码进行静态的类型检查，提前发现类型不一致的问题。
-这样做的好处是，你既可以获得静态类型语言的大部分优势，又不会失去动态类型所带来的灵活性。
+```elixir
+IO.puts(tabularize(to_map(Store.get_host(host))))
+
+or
+
+list_data = Store.get_host(host)
+map = to_map(list)
+formatted_output = tabularize(map)
+IO.puts(formatted_output)
+```
+
+这样的代码在Elixir中可以被写成：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+host
+|> Store.get_host
+|> to_map
+|> tabularize
+|> IO.puts
+```
+
+非常清晰 - 最重要的是，它更符合你的思维模式，让代码更容易在指尖流淌。
+我们写代码的时候，基本就是一个不断「分治」的过程：把大问题分解成小问题，小问题分解成更小的问题，最终解决问题。
+而Elixir让你的代码和你的思路高度一致。
+
+pipe非常灵活，你可以一边组织思路一边组合函数，有点搭积木的节奏。
+
+#### Pattern matching
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+def run(args) do
+end
+
+def run([], _) do
+end 
+
+def run(["show"], _) do
+end
+
+def run(["show", host], _) do
+  IO.pust host
+end 
+
+# ...
+```
+
+这个代码里同一个 run 被定义了很多次，根据参数的不同，会调用不同的函数。
+
+使用pattern matching取代大部分条件分支是件相当伟大的事情：代码的简洁自不必说，
+其效率还有可能进一步优化。if/else是一种顺序执行的逻辑，因为其语法结构的灵活（if的条件里是个函数这事大家都干吧），顶多是对一些特殊的情况使用跳转表优化，大多数情况是O(N)，而且很难并行处理。
+而pattern matching由于其语法上的限制，很多情况可以被优化成decising tree，时间复杂度是O(logN)，而且未来还有并行处理的优化空间。
+
+#### 天生的concurrency支持
+
+这个就不多说了，Erlang的基于actor的并发模型，let it crash的处理思想，supervision tree，error kernel，都是在二十多年来与并发作斗争过程中不断总结出来的best practice，无论在思想上，还是实操上，
+在可预见的未来，没有语言能够超越它。Elixir站在巨人的肩膀上，坐享其成。
+
+#### 服务周到的工具链
+
+进入21世纪以来，新兴的语言都在工具链上卯足了劲，工具链（几乎）成为语言的一部分（一起ship），而非附属品。
+
+Elixir自身携带了mix —— 从项目的创建和scaffolding（mix new），编译（mix compile），到测试（mix test），到文档（mix doc），到依赖管理（mix http://deps.xxx），全部包圆。
+
+> 以上内容参考：[elixir：灵丹妙药？or 徒有其名？](https://zhuanlan.zhihu.com/p/19968376)
 
 <!-- livebook:{"break_markdown":true} -->
 
@@ -162,7 +225,7 @@ Block 结构体中的哈希指针在区块链中有两个作用，它不仅能�
 prev_hash 和 merkleroot 分别通过『指针』的方式保证所有的 Block 和交易都是连接起来的，最终保证 Block 和交易不会被恶意节点或攻击者篡改，几乎全部的区块链项目都会使用类似方式连接不同的 Block 和交易，
 这可以说是区块链项目的基础设施和标配了。
 
-> 以上内容来自 [Draveness博客](https://draveness.me/utxo-account-models/)
+> 以上内容参考：[Draveness博客](https://draveness.me/utxo-account-models/)
 
 ## 创建区块
 
@@ -228,10 +291,10 @@ warning: variable "name" is unused (if the variable is not meant to be used, pre
   share.livemd#cell:4: Blockchain.new_block/2
 
 warning: variable "c" is unused (if the variable is not meant to be used, prefix it with an underscore)
-  share.livemd#cell:12: Blockchain.last_block/1
+  share.livemd#cell:10: Blockchain.last_block/1
 
 warning: variable "block" is unused (if the variable is not meant to be used, prefix it with an underscore)
-  share.livemd#cell:16: Blockchain.hash/1
+  share.livemd#cell:13: Blockchain.hash/1
 
 ```
 
@@ -249,7 +312,10 @@ Elixir的hash要用`:crypto.hash`函数来做，比如
 
 ```elixir
 value = "fenix"
-:crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+
+:crypto.hash(:sha256, value)
+|> Base.encode16()
+|> String.downcase()
 ```
 
 <!-- livebook:{"output":true} -->
@@ -320,7 +386,10 @@ defmodule Blockchain do
 
   def hash(block) do
     value = block |> Poison.encode!()
-    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+
+    :crypto.hash(:sha256, value)
+    |> Base.encode16()
+    |> String.downcase()
   end
 end
 ```
@@ -351,7 +420,7 @@ zero = Blockchain.zero()
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 03:52:41.984864]
+      timestamp: ~N[2022-03-30 03:04:55.073148]
     }
   ],
   current_transactions: []
@@ -377,28 +446,28 @@ zero
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 03:52:41.984864]
+      timestamp: ~N[2022-03-30 03:04:55.073148]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "9539415b7d502d4eddd5e998b8c4def352b512a9ced9481ed0ba8ea3994e5b10",
-      timestamp: ~N[2022-03-29 03:52:41.988072]
+      previous_hash: "45f8bccd937e5fa5f748079324469ca2e8ce6a029e41fdc51b4562f5b74c015a",
+      timestamp: ~N[2022-03-30 03:04:55.085269]
     },
     %{
       current_transactions: [],
       index: 2,
       name: "second",
-      previous_hash: "fb356ad6b9f156807cf70da7d4e309cc24cb8b7203a3f251fb112c1bf6051fc7",
-      timestamp: ~N[2022-03-29 03:52:41.988112]
+      previous_hash: "e2e8f49b22c28c213127c1c255e560cfa4e53036bf427fdbfd4a8c22dccfbcd2",
+      timestamp: ~N[2022-03-30 03:04:55.096235]
     },
     %{
       current_transactions: [],
       index: 3,
       name: "third",
-      previous_hash: "5e31700feefb3980eb374e1e178e57bd69f70e720ce428477490f12b3790b9e8",
-      timestamp: ~N[2022-03-29 03:52:41.988135]
+      previous_hash: "a631e48d99be8b4ca6de3b176ae39a02f9c2518bbd12cf4fbf3f8c9f0f399e55",
+      timestamp: ~N[2022-03-30 03:04:55.096269]
     }
   ],
   current_transactions: []
@@ -513,7 +582,10 @@ defmodule Blockchain do
 
   def hash(block) do
     value = block |> Poison.encode!()
-    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+
+    :crypto.hash(:sha256, value)
+    |> Base.encode16()
+    |> String.downcase()
   end
 end
 ```
@@ -544,7 +616,7 @@ zero = Blockchain.zero()
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 03:52:42.022482]
+      timestamp: ~N[2022-03-30 03:04:55.141196]
     }
   ],
   current_transactions: []
@@ -570,7 +642,7 @@ zero
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 03:52:42.022482]
+      timestamp: ~N[2022-03-30 03:04:55.141196]
     },
     %{
       current_transactions: [
@@ -579,8 +651,8 @@ zero
       ],
       index: 1,
       name: "first",
-      previous_hash: "4710c15877c199f1041c0a1011d2607e30945729d4b0db1a214dc330fb2faccd",
-      timestamp: ~N[2022-03-29 03:52:44.579954]
+      previous_hash: "bcab912d83d57d9b22f1eeadcf37fb810a6276593f65c8343ec15ec13c921af0",
+      timestamp: ~N[2022-03-30 03:04:55.144401]
     }
   ],
   current_transactions: []
@@ -591,39 +663,78 @@ zero
 
 ## 工作量证明PoW
 
-### 比特币白皮书
+因为比特币采用了 PoW 共识机制，所以这个概念才得以被广泛传播。
+PoW 全称 Proof of Work，中文名是工作量证明，PoW 共识机制其实是一种设计思路，
+而不是一种具体的实现。
 
-To implement a distributed timestamp server on a peer-to-peer basis, we will need to use a proof-of-work system similar to Adam Back's Hashcash**[6]**, rather than newspaper or Usenet posts. The proof-of-work involves scanning for a value that when hashed, such as with SHA-256, the hash begins with a number of zero bits. The average work required is exponential in the number of zero bits required and can be verified by executing a single hash.
+PoW 机制其实早在 1997 年就被提出了，它早期多被应用在抵抗滥用软件服务的场景中，
+例如抵抗垃圾邮件（所以 PoW在邮件服务系统会有所涉及）。
 
-为了实现一个基于点对点的分布式时间戳服务器，我们需要使用类似亚当·伯克的哈希现金**[6]**那样的一个工作证明系统，而不是报纸或者新闻组帖子那样的东西。所谓的工作证明，就是去寻找一个数值；这个数值要满足以下条件：为它提取散列数值之后 —— 例如使用 SHA-256 计算散列数值 —— 这个散列数值必须以一定数量的 0 开头。每增加一个 0 的要求，将使得工作量指数级增加，并且，这个工作量的验证却只需通过计算一个哈希。
+我们借用维基百科的一张图来解释一下 PoW 机制是如何用在这个场景中的。
 
-For our timestamp network, we implement the proof-of-work by incrementing a nonce in the block until a value is found that gives the block's hash the required zero bits. Once the CPU effort has been expended to make it satisfy the proof-of-work, the block cannot be changed without redoing the work. As later blocks are chained after it, the work to change the block would include redoing all the blocks after it.
+为了防止垃圾消息泛滥，接收者并不直接接受来自任意发送者的消息，所以在一次有效的会话中，发送者需要计算一个按照规则约定难题的答案，发送给接受者的同时，
+需要附带验证这个答案，如果这个答案被验证有效，那么接受者才会接受这个消息。
 
-在我们的时间戳网络中，我们是这样实现工作证明的：不断在区块之中增加一个随机数（Nonce），直到一个满足条件的数值被找到；这个条件就是，这个区块的哈希以指定数量的 0 开头。一旦 CPU 的耗费算力所获的的结果满足工作证明，那么这个区块将不再能被更改，除非重新完成之前的所有工作量。随着新的区块不断被添加进来，改变当前区块即意味着说要重新完成所有其后区块的工作。
+![](https://static001.geekbang.org/resource/image/c5/82/c5ddd1f74c990471750a8db6ad177182.png)
 
-![](https://raw.githubusercontent.com/zhenfeng-zhu/pic-go/main/202203291159361.png)
+可以看出 PoW 的核心设计思路是提出一个计算难题，但是这个难题答案的验证过程是非常容易的，这种特性我们称之为计算不对称特性
 
-The proof-of-work also solves the problem of determining representation in majority decision making. If the majority were based on one-IP-address-one-vote, it could be subverted by anyone able to allocate many IPs. Proof-of-work is essentially one-CPU-one-vote. The majority decision is represented by the longest chain, which has the greatest proof-of-work effort invested in it. If a majority of CPU power is controlled by honest nodes, the honest chain will grow the fastest and outpace any competing chains. To modify a past block, an attacker would have to redo the proof-of-work of the block and all blocks after it and then catch up with and surpass the work of the honest nodes. We will show later that the probability of a slower attacker catching up diminishes exponentially as subsequent blocks are added.
+### 如何理解区块链PoW
 
-工作证明同时解决了如何决定谁能代表大多数做决定的问题。如果所谓的“大多数”是基于“一个 IP 地址一票”的方式决定的话，那么任何一个可以搞定很多 IP 地址的人就可以被认为是“大多数”。工作证明本质上来看，是“一个 CPU（可以理解为一份算力） 一票”。所谓的“大多数决定”是由最长链所代表的，因为被投入最多工作的链就是它。如果大多数 CPU 算力被诚实的节点所控制，那么诚实链成长最为迅速，其速度会远超其他竞争链。为了更改一个已经产生的区块，攻击者将不得不重新完成那个区块以及所有其后区块的的工作证明，而后还要追上并超过诚实节点的工作。后文展示为什么一个被拖延了的攻击者能够追上的可能性将随着区块的不断增加而指数级降低。
+举个例子，假设我们给定一个字符串“Fenix”，我们提出的难题是，计算一个数字，
+与给定的字符串连接起来，使这个字符串的 SHA256 计算结果的前 4 位是 0，
+这个数字我们称作 nonce，比如字符串 "Fenix1234"，nonce 就是 1234，
+我们要找到符合条件的 nonce。
 
-To compensate for increasing hardware speed and varying interest in running nodes over time, the proof-of-work difficulty is determined by a moving average targeting an average number of blocks per hour. If they're generated too fast, the difficulty increases.
+以Python代码为例子。
 
-为了应对硬件算力综合的不断增加，以及随着时间推进可能产生的节点参与数量变化，工作证明难度由此决定：基于平均每小时产生的区块数量的一个移动平均值。如果区块生成得过快，那么难度将会增加。
+```python
+#!/usr/bin/env python
+import hashlib
 
-### 重要概念解析
+def main():
+    base_string = "Fenix"
+    nonce = 10000
+    count = 0
+    while True:
+        target_string = base_string + str(nonce)
+        pow_hash = hashlib.sha256(target_string).hexdigest()
+        count = count + 1
+        if pow_hash.startswith("0000"):
+            print pow_hash
+            print "nonce: %s  scan times: %s" % (nonce, count)
+            break
+        nonce = nonce + 1
 
-* Nonce
+if __name__ == '__main__':
+    main()
+```
 
-![](https://raw.githubusercontent.com/zhenfeng-zhu/pic-go/main/202203291200313.png)
+我规定了基础字符串是 "Fenix"，nonce 从 10000 开始自增往上搜索，
+直到找到符合条件的 nonce 值。
 
-比特币区块中的 nonce 是一个 32 位（4 字节）的字段。有了这个字段，区块的哈希值（一串 16 进制数字）小于或等于目前网络的目标，也即表示矿工实现了某个工作量。这个字段和其它字段是独立的，也即不会影响到其它的字段。
+```
+# 前4位是0
+0000250248f805c558bc28864a6bb6bf0c244d836a6b1a0c5078987aa219a404
+nonce: 68828  scan times: 58829
+# 前5位是0
+0000067fc247325064f685c32f8a079584b19106c5228b533f10c775638d454c
+nonce: 1241205  scan times: 1231206
+# 前7位是0
+00000003f41b126ec689b1a2da9e7d46d13d0fd1bece47983d53c5d32eb4ac90
+nonce: 165744821  scan times: 165734822
+```
 
-需要注意的是，Nonce 是一个变化的值。可以把它当成比特币系统的一个**「操控杆」**。正是有了这个操控杆，不管有多少算力投入了这个系统，也能保证平均十分钟出一个块。
+可以看出，每次要求哈希结果的前 N 位多一个 0，计算次数就多了很多倍，
+当要求前 7 位都是 0 时，计算次数达到了 1.6 亿次。
+
+> 以上内容参考：[《深入浅出区块链》](https://time.geekbang.org/column/article/5963)
 
 <!-- livebook:{"break_markdown":true} -->
 
-### Go语言版本
+### 其他语言版本
+
+#### Go
 
 ```go
 package main
@@ -662,7 +773,7 @@ func pow(diff string) {
 
 ```
 
-### rust版本
+#### Rust
 
 ```rust
 use sha256::digest;
@@ -691,29 +802,6 @@ fn pow(diff: String) {
 }
 ```
 
-### python版本
-
-```python
-import hashlib
-
-def main(diff):
-    base_str = "fenix"
-    nonce = 10000
-    count = 0
-    while True:
-        target_str = base_str + str(nonce)
-        pow_hash = hashlib.sha256(target_str).hexdigest()
-        count = count + 1
-        if pow_hash.startswith(diff):
-            print(pow_hash)
-            print("nonce: {}, scan times: {}".format(nonce, count))
-            break
-        nonce = nonce + 1
-
-diff = "0000"
-main(diff)
-```
-
 <!-- livebook:{"break_markdown":true} -->
 
 可以看出来，主流编程语言去实现的时候，基本都会选择循环的方式。
@@ -723,19 +811,20 @@ Elixir 的变量是不可变的，常规的循环方式是不可以的，我们�
 ```elixir
 defmodule Pow do
   def work(value, nonce, count, difficulty) do
-    case String.starts_with?(value, difficulty) do
-      true ->
-        IO.puts(value)
-        IO.puts("nonce: #{nonce}, scan times: #{count}")
-
-      _ ->
-        digest("#{value}{nonce}") |> work(nonce + 1, count + 1, difficulty)
+    if String.starts_with?(value, difficulty) do
+      IO.puts(value)
+      IO.puts("nonce: #{nonce}, scan times: #{count}")
+    else
+      digest("#{value}#{nonce}") |> work(nonce + 1, count + 1, difficulty)
     end
   end
 
   def digest(value) do
     IO.write("\rhash: #{value}")
-    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+
+    :crypto.hash(:sha256, value)
+    |> Base.encode16()
+    |> String.downcase()
   end
 end
 ```
@@ -754,10 +843,10 @@ Pow.work("Fenix", 0, 0, "00000")
 <!-- livebook:{"output":true} -->
 
 ```
-hash: 4a63e7904c072195d86fb10af08f0b04e1a23b6ce4dd4201b268d3a23143d8ad{nonce}000075a4039f1ced998f266a88e85282724bbd9c21d8fcc13f49cf605487a750
-nonce: 19327, scan times: 19327
-hash: f4fbf8c27310494b8c7967371464363740dbbd2b2432e2e280f23e7df0638ca6{nonce}000005e60602f672df1a3b18fe027179cdc0f9918fc7529084bc4ddcb02ec6b6
-nonce: 618789, scan times: 618789
+hash: a9d1ee2ad4586af4acc3b3dbd97d85355fbd4f8634a2062b38f4f878d350eb7e1770240000303ab87561a134d5ba70ff0dc96f59df2cb2c76a12418363a7065d7021e5
+nonce: 177025, scan times: 177025
+hash: 78ba29b80a1a9a0dbd363f00119a1822aad18cf999b93b732ff6fe7c42d4ee6b1468816000002fc5a2268fc4e118f4a221e1e76991c3f9a20d683f489e8466e26fcde54
+nonce: 1468817, scan times: 1468817
 ```
 
 <!-- livebook:{"output":true} -->
@@ -824,7 +913,10 @@ defmodule Blockchain do
 
   def hash(block) do
     value = block |> Poison.encode!()
-    :crypto.hash(:sha256, value) |> Base.encode16() |> String.downcase()
+
+    :crypto.hash(:sha256, value)
+    |> Base.encode16()
+    |> String.downcase()
   end
 
   def proof_of_work(last_nonce, nonce \\ 0) do
@@ -873,7 +965,7 @@ zero = Blockchain.zero()
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 04:08:24.219740]
+      timestamp: ~N[2022-03-30 03:05:49.057447]
     }
   ],
   current_transactions: [],
@@ -942,14 +1034,14 @@ difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 04:08:24.219740]
+      timestamp: ~N[2022-03-30 03:05:49.057447]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "98a230c70b6529c69bb0475561c8f0ece30c5b89e59e39a6ecc5972c0032bd80",
-      timestamp: ~N[2022-03-29 04:11:08.177860]
+      previous_hash: "c270b737b8d7d5fcb3296d9779d65aa1c100dc1d2df905c3d11b23f4f7d126d9",
+      timestamp: ~N[2022-03-30 03:05:57.492513]
     }
   ],
   current_transactions: [],
@@ -995,14 +1087,14 @@ difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 04:11:20.130037]
+      timestamp: ~N[2022-03-30 03:06:01.573726]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "6ca063fa2dfd65f4a93f2e126a71dbf3895837d79671a9a91369d2931954e4c1",
-      timestamp: ~N[2022-03-29 04:11:20.781126]
+      previous_hash: "e89f6ab0449f7d98126453233046e0d89a12aec6531679a16366468cac21f81f",
+      timestamp: ~N[2022-03-30 03:06:02.337924]
     }
   ],
   current_transactions: [],
@@ -1015,21 +1107,21 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 04:11:20.130037]
+      timestamp: ~N[2022-03-30 03:06:01.573726]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "6ca063fa2dfd65f4a93f2e126a71dbf3895837d79671a9a91369d2931954e4c1",
-      timestamp: ~N[2022-03-29 04:11:20.781126]
+      previous_hash: "e89f6ab0449f7d98126453233046e0d89a12aec6531679a16366468cac21f81f",
+      timestamp: ~N[2022-03-30 03:06:02.337924]
     },
     %{
       current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
       index: 2,
       name: "second",
-      previous_hash: "5a4b9b0e61bdc58a2c18dee51a92b6c31187e8cc0648cafc18472543d957f3dd",
-      timestamp: ~N[2022-03-29 04:11:21.016550]
+      previous_hash: "75ca81c9785324a4350c9a8261240c34e9414c2f90897f504f585402ea9235ad",
+      timestamp: ~N[2022-03-30 03:06:02.541634]
     }
   ],
   current_transactions: [],
@@ -1047,21 +1139,21 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-29 04:11:20.130037]
+      timestamp: ~N[2022-03-30 03:06:01.573726]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "6ca063fa2dfd65f4a93f2e126a71dbf3895837d79671a9a91369d2931954e4c1",
-      timestamp: ~N[2022-03-29 04:11:20.781126]
+      previous_hash: "e89f6ab0449f7d98126453233046e0d89a12aec6531679a16366468cac21f81f",
+      timestamp: ~N[2022-03-30 03:06:02.337924]
     },
     %{
       current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
       index: 2,
       name: "second",
-      previous_hash: "5a4b9b0e61bdc58a2c18dee51a92b6c31187e8cc0648cafc18472543d957f3dd",
-      timestamp: ~N[2022-03-29 04:11:21.016550]
+      previous_hash: "75ca81c9785324a4350c9a8261240c34e9414c2f90897f504f585402ea9235ad",
+      timestamp: ~N[2022-03-30 03:06:02.541634]
     }
   ],
   current_transactions: [],
@@ -1071,12 +1163,21 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
 
 ## 贤者时间
 
-如今容器技术发展得如 火如荼，无服务计算(Serverless)方兴未艾，“以应用为中心”成为一种新的架构理念。
-从云原生生态的角度看，Docker、K8S、Serverless 等一系列基础设施都在以与语言无关的方式回答可伸缩和可维护的问题。
-反观 Elixir，开箱即用、完整的构建和发布工具链、面向高并发的 Actor 模型，以及构建大型可伸缩、支持热更新的 OTP 框架，都让它显得小而美。
-Elixir 本地开发和部署到云端的版本无差异，它从语言层面、原生工具层面就开始考虑这些问题，在业务逻辑和健壮应用之间没有脱节，不需要学额外的框架，更不需要熟悉复杂的第三方平台。
+编程的世界是永无止境的，写代码没有唯一正确的方法：
 
-掌握 Elixir 也许目前还不能给你的简历添彩，让你在职场获得更高的溢价，但学习 Elixir 可以让你以不同的视角去看待函数、可变性、并发、高可用。
-软件工程最大的挑战是，在持续满足业务复杂度的同时，保持工程的可维护性。 
-而 Elixir 给出了从语言层面出发的系统性解法。
-虽然这门语言尚未流行起来， 但这一点也不能掩盖它的优秀。
+* 面向对象不是设计代码的唯一方法
+* 函数式编程不一定是复杂的和纯数学的
+* 编程的基础不是赋值、if语句和循环
+* 并发不一定需要锁、信号量、监视器等类似的东西
+* 进程不必消耗大量的资源
+* 元编程不只是语言的附属品
+* 即使编程是你的工作，也应该是充满乐趣的
+
+掌握 Elixir 也许目前还不能给你的简历添彩，让你在职场获得更高的溢价，
+但学习 Elixir 可以让你以不同的视角去看待函数、可变性、并发、高可用。
+
+与主流的编程语言相比，Elixir非常与众不同，它会丰富你的视角，并开阔你的眼界来接受新的编程思维。
+
+<!-- livebook:{"break_markdown":true} -->
+
+最后，Why Elixir & Blockchain？ 确保Web3发生在Elixir！
