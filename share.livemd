@@ -1,6 +1,6 @@
 <!-- livebook:{"persist_outputs":true} -->
 
-# Elixir实现简易区块链（分享版）
+# 使用Elixir实现一条简易POW区块链
 
 ## Why Elixir
 
