@@ -12,22 +12,22 @@
 
 #### 惊艳的语法
 
-Elixir的语法在向Ruby致敬，同时透着Erlang和Prolog的灵气。
-任何语言语法的设计都和其创始人的偏好和目标分不开，Ken Thompson/Rob Pike的golang看上去很C，Jose Valim的Elixir自然就很Ruby。
-当然，植根于Erlang的Elixir，又有有很多自己的特点。
+Elixir的语法在向Ruby致敬，同时透着Erlang灵气。
+任何语言语法的设计都和其创始人的偏好和目标分不开，Elixir作者之前是做Rails社区核心开发者，所以语法上自然就很Ruby。
+当然，植根于Erlang的Elixir，又有很多自己的特点。
 
-最让人爱不释手的是pipe `|>`, 它让你把一层层的逆着你的思维的函数调用变成了更直观的表现，比如说我们常常这么写代码：
+最让人爱不释手的是pipe `|>`, 它把一层层的逆着思维的函数调用变成了更直观的表现，比如说我们常常这么写代码：
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-IO.puts(tabularize(to_map(Store.get_host(host))))
+IO.puts(format(to_map(Store.get_host(host))))
 
 or
 
 list_data = Store.get_host(host)
 map = to_map(list)
-formatted_output = tabularize(map)
+formatted_output = format(map)
 IO.puts(formatted_output)
 ```
 
@@ -39,53 +39,93 @@ IO.puts(formatted_output)
 host
 |> Store.get_host
 |> to_map
-|> tabularize
+|> foramt
 |> IO.puts
 ```
 
-非常清晰 - 最重要的是，它更符合你的思维模式，让代码更容易在指尖流淌。
+非常清晰！最重要的是，它更符合你的思维模式，让代码更容易在指尖流淌。
 我们写代码的时候，基本就是一个不断「分治」的过程：把大问题分解成小问题，小问题分解成更小的问题，最终解决问题。
 而Elixir让你的代码和你的思路高度一致。
 
-pipe非常灵活，你可以一边组织思路一边组合函数，有点搭积木的节奏。
+pipe非常灵活，你可以一边组织思路一边组合函数，有点搭积木的感觉。
 
-#### Pattern matching
+#### 模式匹配
+
+凡是学过一点点编程的人应该都知道，= 是大多数编程语言的赋值操作符。
+即便不是这样，也会有类似的一个符号，在它的左边是一个变量，右边是赋值给它的常量，
+其它变量或一些运算，比如：a = 1 或者 a = max(number_list)。
+
+但是，在 Elixir 里面，= 是匹配操作符。
 
 <!-- livebook:{"force_markdown":true} -->
 
 ```elixir
-def run(args) do
-end
-
-def run([], _) do
-end 
-
-def run(["show"], _) do
-end
-
-def run(["show", host], _) do
-  IO.pust host
-end 
-
-# ...
+iex>a = 1
+1
+iex>1 = a
+1
+iex>2 = a
+** (MatchError) no match of right hand side value: 1
 ```
 
-这个代码里同一个 run 被定义了很多次，根据参数的不同，会调用不同的函数。
+Elixir 的模式匹配和递归配合起来使用，实在是太爽了。
+完全不必用到 if else 之流来判断边界值，代码表达得相当优雅。
 
-使用pattern matching取代大部分条件分支是件相当伟大的事情：代码的简洁自不必说，
+我觉得，递归可以说非常好地体现了 First Principle 原则。只有看透数据处理的本质，才能理解递归。
+我们来看看书中的一句霸气的话吧：
+
+> L. Peter Deutsch once penned, “To iterate is human, to recurse divine.”
+
+什么意思？“使用遍历的是普通人，能用递归的是神”。
+
+举个例子感受一下：
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule Recursion do
+  def sum(0), do: 0
+  def sum(n), do: n + sum(n - 1)
+end
+
+IO.puts Recursion.sum(5)  # => 15
+
+```
+
+这个函数计算了某个给定数字之下的所有正整数之和。以上的例子就是计算 5+4+3+2+1+0
+
+使用模式匹配取代大部分条件分支是件相当伟大的事情：代码的简洁自不必说，
 其效率还有可能进一步优化。if/else是一种顺序执行的逻辑，因为其语法结构的灵活（if的条件里是个函数这事大家都干吧），顶多是对一些特殊的情况使用跳转表优化，大多数情况是O(N)，而且很难并行处理。
-而pattern matching由于其语法上的限制，很多情况可以被优化成decising tree，时间复杂度是O(logN)，而且未来还有并行处理的优化空间。
+而pattern matching由于其语法上的限制，很多情况可以被优化成决策树，时间复杂度是O(logN)，而且未来还有并行处理的优化空间。
 
-#### 天生的concurrency支持
+#### Macro
 
-这个就不多说了，Erlang的基于actor的并发模型，let it crash的处理思想，supervision tree，error kernel，都是在二十多年来与并发作斗争过程中不断总结出来的best practice，无论在思想上，还是实操上，
+很多人看到 macro 眼前一黑，总觉得它代表了某种神秘的力量。
+
+实际上，我们可以认为 macro 是 一个特殊的函数，这个函数接受的参数是语法树（一个或者多个），然后返回一个语法树。
+
+defmodule 块是语法吗？不，它是一个宏。def 块是语法吗？不，它还是一个宏。
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+x in [1, 2, 3] # => true
+```
+
+这应该是一个语法了吧？不，连 in 都是宏。
+
+#### 天生的并发支持
+
+Elixir 建立于 Erlang 之上，最终编译为完全等同的字节码模块，可互相调用。
+
+Erlang的基于actor的并发模型，let it crash的处理思想，监督树，错误处理，都是在二十多年来与并发作斗争过程中不断总结出来的best practice，无论在思想上，还是实操上，
 在可预见的未来，没有语言能够超越它。Elixir站在巨人的肩膀上，坐享其成。
 
 #### 服务周到的工具链
 
-进入21世纪以来，新兴的语言都在工具链上卯足了劲，工具链（几乎）成为语言的一部分（一起ship），而非附属品。
+进入21世纪以来，新兴的语言在工具链上也都是卯足了劲，工具链（几乎）成为语言的一部分，而非附属品。
 
-Elixir自身携带了mix —— 从项目的创建和scaffolding（mix new），编译（mix compile），到测试（mix test），到文档（mix doc），到依赖管理（mix http://deps.xxx），全部包圆。
+Elixir自身携带了mix —— 从项目的创建和scaffolding（mix new），编译（mix compile），到测试（mix test），到文档（mix doc），到依赖管理（mix deps），全部包圆。
 
 > 以上内容参考：[elixir：灵丹妙药？or 徒有其名？](https://zhuanlan.zhihu.com/p/19968376)
 
@@ -112,7 +152,7 @@ https://livebook.dev/
 
 ```elixir
 Mix.install(
-  [:poison]
+  [:poison, :req]
   # force: true,
   # verbose: true
 )
@@ -123,6 +163,41 @@ Mix.install(
 ```
 :ok
 ```
+
+```elixir
+%{hello: "world", arr: [1, 2, 3]}
+|> Poison.encode!()
+|> IO.inspect()
+
+"{\"hello\": \"world\",\"arr\": [1, 2, 3]}"
+|> Poison.decode!()
+|> IO.inspect()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"{\"hello\":\"world\",\"arr\":[1,2,3]}"
+%{"arr" => [1, 2, 3], "hello" => "world"}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{"arr" => [1, 2, 3], "hello" => "world"}
+```
+
+```elixir
+Req.get!("https://api.github.com/repos/elixir-lang/elixir").body["description"]
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"Elixir is a dynamic, functional language designed for building scalable and maintainable applications"
+```
+
+可玩性很高，更多例子可以参考：https://github.com/wojtekmach/mix_install_examples
 
 ## Blockchain介绍
 
@@ -308,22 +383,6 @@ warning: variable "block" is unused (if the variable is not meant to be used, pr
 
 <!-- livebook:{"break_markdown":true} -->
 
-Elixir的hash要用`:crypto.hash`函数来做，比如
-
-```elixir
-value = "fenix"
-
-:crypto.hash(:sha256, value)
-|> Base.encode16()
-|> String.downcase()
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-"b170f30d201da73b7637e94391f22a4642f8c396f9c1c9f8b2799919ced46d78"
-```
-
 补全new_block函数：
 
 <!-- livebook:{"force_markdown":true} -->
@@ -346,6 +405,22 @@ end
 * %{c | chain: c.chain ++ [b], current_transactions: []} 是一个语法糖，把当前区块 append 到链上。
 
 <!-- livebook:{"break_markdown":true} -->
+
+Elixir的hash要用`:crypto.hash`函数来做，比如
+
+```elixir
+value = "fenix"
+
+:crypto.hash(:sha256, value)
+|> Base.encode16()
+|> String.downcase()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"b170f30d201da73b7637e94391f22a4642f8c396f9c1c9f8b2799919ced46d78"
+```
 
 完整的程序如下：
 
@@ -420,7 +495,7 @@ zero = Blockchain.zero()
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:04:55.073148]
+      timestamp: ~N[2022-04-01 12:17:21.126190]
     }
   ],
   current_transactions: []
@@ -446,28 +521,28 @@ zero
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:04:55.073148]
+      timestamp: ~N[2022-04-01 12:17:21.126190]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "45f8bccd937e5fa5f748079324469ca2e8ce6a029e41fdc51b4562f5b74c015a",
-      timestamp: ~N[2022-03-30 03:04:55.085269]
+      previous_hash: "dd9a0b7a81ba060c2d1cd7e581ad0bda35c7019831049b39dbcc1c35a8f3f131",
+      timestamp: ~N[2022-04-01 12:17:35.067392]
     },
     %{
       current_transactions: [],
       index: 2,
       name: "second",
-      previous_hash: "e2e8f49b22c28c213127c1c255e560cfa4e53036bf427fdbfd4a8c22dccfbcd2",
-      timestamp: ~N[2022-03-30 03:04:55.096235]
+      previous_hash: "f93e075bef13d86514a77d407e36ac9d3b2636769bfe483a3ecc4a2afd5b88ac",
+      timestamp: ~N[2022-04-01 12:17:35.067467]
     },
     %{
       current_transactions: [],
       index: 3,
       name: "third",
-      previous_hash: "a631e48d99be8b4ca6de3b176ae39a02f9c2518bbd12cf4fbf3f8c9f0f399e55",
-      timestamp: ~N[2022-03-30 03:04:55.096269]
+      previous_hash: "0ac2d3ec623b955ef6781ff130f6aa8f65b1dd1022f9c7f6a60d40ee03ed3c8a",
+      timestamp: ~N[2022-04-01 12:17:35.067551]
     }
   ],
   current_transactions: []
@@ -482,11 +557,11 @@ zero
 
 ```json
 {
-  from: from_addr,
-  to: to_addr,
-  amount: amount, # 仅公链有效
-  gas: gas, # 手续费
-  op: operation # 附带的操作
+    from: from_addr,
+    to: to_addr,
+    amount: amount, # 仅公链有效
+    gas: gas, # 手续费
+    op: operation # 附带的操作
 }
 ```
 
@@ -616,7 +691,7 @@ zero = Blockchain.zero()
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:04:55.141196]
+      timestamp: ~N[2022-04-01 12:20:26.788775]
     }
   ],
   current_transactions: []
@@ -642,7 +717,7 @@ zero
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:04:55.141196]
+      timestamp: ~N[2022-04-01 12:20:26.788775]
     },
     %{
       current_transactions: [
@@ -651,8 +726,8 @@ zero
       ],
       index: 1,
       name: "first",
-      previous_hash: "bcab912d83d57d9b22f1eeadcf37fb810a6276593f65c8343ec15ec13c921af0",
-      timestamp: ~N[2022-03-30 03:04:55.144401]
+      previous_hash: "56881bced4dd4b52f76cc75e0b7f217fe4696e3e15974d4c174d84fb4205b92a",
+      timestamp: ~N[2022-04-01 12:20:39.174474]
     }
   ],
   current_transactions: []
@@ -965,7 +1040,7 @@ zero = Blockchain.zero()
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:05:49.057447]
+      timestamp: ~N[2022-04-01 12:27:28.717693]
     }
   ],
   current_transactions: [],
@@ -1034,14 +1109,14 @@ difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:05:49.057447]
+      timestamp: ~N[2022-04-01 12:27:28.717693]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "c270b737b8d7d5fcb3296d9779d65aa1c100dc1d2df905c3d11b23f4f7d126d9",
-      timestamp: ~N[2022-03-30 03:05:57.492513]
+      previous_hash: "d530c9090258905de8009fe933f8e4686916adc3e803b89600615a2fb817392d",
+      timestamp: ~N[2022-04-01 12:28:33.450247]
     }
   ],
   current_transactions: [],
@@ -1087,14 +1162,14 @@ difficulty: 0000, attempt: 69732, hash: 0000e326186933fa83f0efd581d09409022ec07b
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:06:01.573726]
+      timestamp: ~N[2022-04-01 12:29:06.201828]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "e89f6ab0449f7d98126453233046e0d89a12aec6531679a16366468cac21f81f",
-      timestamp: ~N[2022-03-30 03:06:02.337924]
+      previous_hash: "b8099550bfe6931ad0eccb7a18d1d638d33177fe6ecc7621dcb593bdc406cf00",
+      timestamp: ~N[2022-04-01 12:29:06.916490]
     }
   ],
   current_transactions: [],
@@ -1107,21 +1182,21 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:06:01.573726]
+      timestamp: ~N[2022-04-01 12:29:06.201828]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "e89f6ab0449f7d98126453233046e0d89a12aec6531679a16366468cac21f81f",
-      timestamp: ~N[2022-03-30 03:06:02.337924]
+      previous_hash: "b8099550bfe6931ad0eccb7a18d1d638d33177fe6ecc7621dcb593bdc406cf00",
+      timestamp: ~N[2022-04-01 12:29:06.916490]
     },
     %{
       current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
       index: 2,
       name: "second",
-      previous_hash: "75ca81c9785324a4350c9a8261240c34e9414c2f90897f504f585402ea9235ad",
-      timestamp: ~N[2022-03-30 03:06:02.541634]
+      previous_hash: "5e1e75f4822ac949e20944175a39d9301ad278611eb74043cb761ba83742df8c",
+      timestamp: ~N[2022-04-01 12:29:07.222425]
     }
   ],
   current_transactions: [],
@@ -1139,21 +1214,21 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
       index: 0,
       name: "ZERO",
       previous_hash: "",
-      timestamp: ~N[2022-03-30 03:06:01.573726]
+      timestamp: ~N[2022-04-01 12:29:06.201828]
     },
     %{
       current_transactions: [],
       index: 1,
       name: "first",
-      previous_hash: "e89f6ab0449f7d98126453233046e0d89a12aec6531679a16366468cac21f81f",
-      timestamp: ~N[2022-03-30 03:06:02.337924]
+      previous_hash: "b8099550bfe6931ad0eccb7a18d1d638d33177fe6ecc7621dcb593bdc406cf00",
+      timestamp: ~N[2022-04-01 12:29:06.916490]
     },
     %{
       current_transactions: [%{amount: 100, recipient: "bob", sender: "alice"}],
       index: 2,
       name: "second",
-      previous_hash: "75ca81c9785324a4350c9a8261240c34e9414c2f90897f504f585402ea9235ad",
-      timestamp: ~N[2022-03-30 03:06:02.541634]
+      previous_hash: "5e1e75f4822ac949e20944175a39d9301ad278611eb74043cb761ba83742df8c",
+      timestamp: ~N[2022-04-01 12:29:07.222425]
     }
   ],
   current_transactions: [],
@@ -1163,7 +1238,15 @@ difficulty: 0000, attempt: 23263, hash: 0000ffc4b3bdbd6d46a4649d48944700b204fe59
 
 ## 贤者时间
 
-编程的世界是永无止境的，写代码没有唯一正确的方法：
+编程就是数据转换
+
+> Programming Should Be About Transforming Data.
+
+如果你深刻地理解了这句话，数据分析的 ETL（Extract - Transform - Load）是那么地自然，Map/Reduce 分而治之也是很好理解。
+
+<!-- livebook:{"break_markdown":true} -->
+
+写代码没有唯一正确的方法，我们应该稍稍改变一下思考的方式：
 
 * 面向对象不是设计代码的唯一方法
 * 函数式编程不一定是复杂的和纯数学的
