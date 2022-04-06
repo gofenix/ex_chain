@@ -1,0 +1,314 @@
+<!-- livebook:{"persist_outputs":true} -->
+
+# ETH
+
+## Setup
+
+```elixir
+Mix.install(
+  [:ethereumex],
+  force: true,
+  verbose: true,
+  config: [
+    ethereumex: [
+      url: "https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+    ]
+  ]
+)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+Mix.install/2 using /Users/lucas/Library/Caches/mix/installs/elixir-1.13.3-erts-12.3.1/da0e89067ca32db9b67a80cd6e5a8c20
+Resolving Hex dependencies...
+Dependency resolution completed:
+New:
+  castore 0.1.16
+  ethereumex 0.9.2
+  finch 0.11.0
+  hpax 0.1.1
+  jason 1.3.0
+  mint 1.4.1
+  nimble_options 0.4.0
+  nimble_pool 0.2.6
+  poolboy 1.5.2
+  telemetry 1.1.0
+* Getting ethereumex (Hex package)
+* Getting finch (Hex package)
+* Getting jason (Hex package)
+* Getting poolboy (Hex package)
+* Getting telemetry (Hex package)
+* Getting castore (Hex package)
+* Getting mint (Hex package)
+* Getting nimble_options (Hex package)
+* Getting nimble_pool (Hex package)
+* Getting hpax (Hex package)
+==> nimble_options
+Compiling 3 files (.ex)
+Generated nimble_options app
+==> hpax
+Compiling 4 files (.ex)
+Generated hpax app
+==> nimble_pool
+Compiling 2 files (.ex)
+Generated nimble_pool app
+===> Analyzing applications...
+===> Compiling poolboy
+===> Analyzing applications...
+===> Compiling telemetry
+==> jason
+Compiling 10 files (.ex)
+Generated jason app
+==> castore
+Compiling 1 file (.ex)
+Generated castore app
+==> mint
+Compiling 1 file (.erl)
+Compiling 19 files (.ex)
+Generated mint app
+==> finch
+Compiling 12 files (.ex)
+Generated finch app
+==> ethereumex
+Compiling 9 files (.ex)
+Generated ethereumex app
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+```elixir
+## check
+Ethereumex.Config.rpc_url()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+"https://ropsten.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161"
+```
+
+```elixir
+defmodule Utils do
+  def hex_to_int(hex) do
+    hex
+    |> String.slice(2..-1)
+    |> String.to_integer(16)
+  end
+end
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:module, Utils, <<70, 79, 82, 49, 0, 0, 6, ...>>, {:hex_to_int, 1}}
+```
+
+## 基本API使用
+
+```elixir
+{:ok, payload} = Ethereumex.HttpClient.eth_block_number()
+
+Utils.hex_to_int(payload)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+12161872
+```
+
+```elixir
+Ethereumex.HttpClient.eth_get_block_by_number(payload, false)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok,
+ %{
+   "baseFeePerGas" => "0xa3e",
+   "difficulty" => "0xfe9f161b",
+   "extraData" => "0xd883010a10846765746888676f312e31372e35856c696e7578",
+   "gasLimit" => "0x7a1200",
+   "gasUsed" => "0x6632f4",
+   "hash" => "0x5fa0079c5583c1c50f756846788c94fb4358ada897c442c03dab967541d9b920",
+   "logsBloom" => "0x0400800000004008000000000080040000000000000001000900000200000000000100000000008000000000110010028080000840000000000100c0400000000004000000000a00010088000040200080000080004000000000000008000c000803000070000000800000008010004108000000400000040020000010000010100000000000000021a0000000001020000000000404000c00000000100000000010000000000182800001000000000000010400000100802030000000100a00b0004000040000040040000800081000091000008000800000000001040000001000200800088020000000000200000000004000208080000408420008000040",
+   "miner" => "0x637ee9752eb0dace27a9b0b7556ffaf96b847480",
+   "mixHash" => "0xbe8fa1b7c2da0697f896029cbb0c3751b3ca97081890d64054b0b25e87ad6cab",
+   "nonce" => "0x80ea3d249c654480",
+   "number" => "0xb99350",
+   "parentHash" => "0x30aaf1895683380379c1323e69de1ca44090087c31b96f039e3b9acef8d2917d",
+   "receiptsRoot" => "0x63a2d37e47effee17ea6013682d8f0ce25b830e792012e04180d4100d1f4fea4",
+   "sha3Uncles" => "0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347",
+   "size" => "0x8270",
+   "stateRoot" => "0xa58aafc203d31f59eac5ee59fd8a0e3236495776cbb4a356f6e657a05d1242f5",
+   "timestamp" => "0x624ae6ef",
+   "totalDifficulty" => "0x91cb082ed20743",
+   "transactions" => ["0xf58b9c354fbf68802db3ef418164df1c2df0db253ee9a9130dcb52b106283e8a",
+    "0x1714c5cfbac216497f12ffc7c6859013fd068b1a695326ff05c11e4cf9da4fbe",
+    "0x3a48c61194658dacc78e6f0307df60f9c2f08eec1aee1c8c28a5fad33388f0f6",
+    "0xb35e1410f3989fd11bc444fedf6696713bc42b4ae743f793df57cdc8971ff741",
+    "0xfd7295014ee89f444b492287c0d0060b80a2d380a7ee557e4938419ad0b40805",
+    "0x1a23f6fa8bdf64a72a178dd4e53d7e094c1ca795cc7732e00b328294449f507d",
+    "0x18c1eb84462eb7a4423f226c1a89b3cffbc0847462d7c627d0772a1703061acf",
+    "0x02c063cbd47a0908148398658c2bc107f8fc280120eac9daa6fbf9cb80399665",
+    "0xe3c7c7b7012b0cd9bc5e41549f90dcbcf8b3555a665a38362f263511cc7c3c7f",
+    "0xd28ae4abb2be72827402a60c6d88459c3f06e66a363fc481a288892569a75a8c",
+    "0x38ca6560c55eecaef21514ba0264dff4c051d2986fbecf096b7fad8ccd9c2eb8",
+    "0xb4343aa84b43c1e43f3d1fc2bf01038d2e08e345afcf252d62c4e4716d007d38",
+    "0x9662306a79f8a9abb85b60e210a52ea1a8fce8aefa213cc3dccd623aaf235381",
+    "0x2e0f1c85150954a2de0c36b14560fa4003dd07594ab1164593cfe132d54c2ea7",
+    "0x0b93dd908680db7afbffbf4d2f181ae39f086aedb5b012bdc417858aceac70eb",
+    "0x544e2551a0b29da69f78daaca58be586ea63c5acb969ae481e5b13849b0d66c6",
+    "0xbb25bac25d952cb17a504f3fa67fb8cac73fb954e3912f6dbae2552a06710248",
+    "0xd01d970e120c17a48a0733377d6c35bfe15ad36b5429a70210559cfd94d51f22",
+    "0xd9fe5baa65e553941af2278d88008da41937c029c84a212059abd93cc7dcda91",
+    "0xea5415f1a6e93eea56e68dd2562ca4aec29241c2b4ecb7e7d3a15b08bb9f7669",
+    "0x72b82bd295954503ef4e3d1c5780f88b3132d2037a52fedfb14b1ded1af755ce",
+    "0x3dff97f6d2b9c7786401f93ad6e3978c8b13d915f9defbda7f01e3b15b7d2841",
+    "0x0d6677ba0a73ba26c4ff44c5765aa45c1700be60e95eb42a4ff2eca726cf2b6d",
+    "0x287ac66d8f79444fc84527241c7e6ecee5752ecbec493eec9d720aec29421fba",
+    "0x53a6531fb470bd718ec15ca283e4d93e2df9d4e9501978da4c675d52af7dcd5e",
+    "0x4de7bc2434957dd4dacb15e3cb082e30da66efe97470f0a3d81047c413efc52a",
+    "0xa973e585f9823cd64ac8162b1139e96e45ce41ef2420f0916a62fb538745230c",
+    "0x498b55d1e0e3f68c19a8f6d19ee23535b866050139aecb3feb5e9a033d590c1f",
+    "0x9b3c28ede8d4b5f231f6651fc1d0f8b8fc0965c0ab1da4e8f753ef92ec85f78c", ...],
+   "transactionsRoot" => "0x6f2de5ae6a4a00f022d2a467351706bfd2b4f89008ff2f16627ba173feea5a20",
+   "uncles" => []
+ }}
+```
+
+```elixir
+Ethereumex.HttpClient.eth_get_transaction_by_hash(
+  "0xb1605f0cca61569da236daf30209cc766a989186e3a5f8710af8725e15d6d15b"
+)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok,
+ %{
+   "blockHash" => "0x588d022f16f7f908819e8fea6c168ca44435e28934ec8eb7881e342b618a0d7c",
+   "blockNumber" => "0xb97f6a",
+   "from" => "0x957e72a4e706c90effb25e465a6c0b511718f089",
+   "gas" => "0x7a1200",
+   "gasPrice" => "0x174876e800",
+   "hash" => "0xb1605f0cca61569da236daf30209cc766a989186e3a5f8710af8725e15d6d15b",
+   "input" => "0xfdacd5760000000000000000000000000000000000000000000000000000000000000002",
+   "nonce" => "0xf",
+   "r" => "0x5d092487a692af8865fb08c3173d1ec994daca3ba07ab92b19c8da49a37af03b",
+   "s" => "0x64640d860c09a0d3cf264128c843e899bbbc0bedf695f409fbd59b42fb61508e",
+   "to" => "0x2ffa0b61d93b29944daf615716cb78a4a3e21cd6",
+   "transactionIndex" => "0x0",
+   "type" => "0x0",
+   "v" => "0x29",
+   "value" => "0x0"
+ }}
+```
+
+```elixir
+Ethereumex.HttpClient.eth_get_transaction_receipt(
+  "0x441c008ff96cbe95ca3b9889cf044c837b90e3001b9eba24fa430f6757a1c046"
+)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok,
+ %{
+   "blockHash" => "0xbdeff7f69d8c97fb7d32e112ba231a75892ff1743837518762306c0b9b331132",
+   "blockNumber" => "0xb1ca1b",
+   "contractAddress" => nil,
+   "cumulativeGasUsed" => "0x168ae",
+   "effectiveGasPrice" => "0x9f81246c",
+   "from" => "0x57d8493313acbfb4f788e8d74e36ea90118435aa",
+   "gasUsed" => "0x168ae",
+   "logs" => [
+     %{
+       "address" => "0x8707a5bf4c2842d46b31a405ba41b858c0f876c4",
+       "blockHash" => "0xbdeff7f69d8c97fb7d32e112ba231a75892ff1743837518762306c0b9b331132",
+       "blockNumber" => "0xb1ca1b",
+       "data" => "0x000000000000000000000000000000000000000000000000000000746a528800",
+       "logIndex" => "0x0",
+       "removed" => false,
+       "topics" => ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef",
+        "0x00000000000000000000000057d8493313acbfb4f788e8d74e36ea90118435aa",
+        "0x000000000000000000000000014f738ead8ec6c50bcd456a971f8b84cd693bbe"],
+       "transactionHash" => "0x441c008ff96cbe95ca3b9889cf044c837b90e3001b9eba24fa430f6757a1c046",
+       "transactionIndex" => "0x0"
+     },
+     %{
+       "address" => "0x8707a5bf4c2842d46b31a405ba41b858c0f876c4",
+       "blockHash" => "0xbdeff7f69d8c97fb7d32e112ba231a75892ff1743837518762306c0b9b331132",
+       "blockNumber" => "0xb1ca1b",
+       "data" => "0xffffffffffffffffffffffffffffffffffffffffffffffffffa60bfff91c79ff",
+       "logIndex" => "0x1",
+       "removed" => false,
+       "topics" => ["0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925",
+        "0x00000000000000000000000057d8493313acbfb4f788e8d74e36ea90118435aa",
+        "0x000000000000000000000000014f738ead8ec6c50bcd456a971f8b84cd693bbe"],
+       "transactionHash" => "0x441c008ff96cbe95ca3b9889cf044c837b90e3001b9eba24fa430f6757a1c046",
+       "transactionIndex" => "0x0"
+     },
+     %{
+       "address" => "0x014f738ead8ec6c50bcd456a971f8b84cd693bbe",
+       "blockHash" => "0xbdeff7f69d8c97fb7d32e112ba231a75892ff1743837518762306c0b9b331132",
+       "blockNumber" => "0xb1ca1b",
+       "data" => "0x00000000000000000000000057d8493313acbfb4f788e8d74e36ea90118435aa012604f30fea84d281698f6a8aab8a6b5ab54c4d0f4a38382a918d10fd768e3b000000000000000000000000000000000000000000000000000000000000a06802c04d8b650f44092278a7cb1e1028c82025dff622db96c934b611b84cc8de5a000000000000000000000000000000000000000000000000000000746a528800000000000000000000000000000000000000000000000000000000746a528800",
+       "logIndex" => "0x2",
+       "removed" => false,
+       "topics" => ["0x06724742ccc8c330a39a641ef02a0b419bd09248360680bb38159b0a8c2635d6"],
+       "transactionHash" => "0x441c008ff96cbe95ca3b9889cf044c837b90e3001b9eba24fa430f6757a1c046",
+       "transactionIndex" => "0x0"
+     }
+   ],
+   "logsBloom" => "0x00000000000000000000000000000000000000000000000000000000000000000000000000001000000040000000000000000000000000000000000000200000000000000000000280000008180000000000000000000000000004000000000000000000020000000000000000000000000000000000000000000010000000000000000000000000000010000000000000000400000000000000000000000001020000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000800000000000000000000000000410000000000000000000000000000000040000000000800000000000000000",
+   "status" => "0x1",
+   "to" => "0x014f738ead8ec6c50bcd456a971f8b84cd693bbe",
+   "transactionHash" => "0x441c008ff96cbe95ca3b9889cf044c837b90e3001b9eba24fa430f6757a1c046",
+   "transactionIndex" => "0x0",
+   "type" => "0x0"
+ }}
+```
+
+```elixir
+{:ok, balance} =
+  Ethereumex.HttpClient.eth_get_balance(
+    "0xC3A9d35BFFCb9E9363b5911A0e255743AA6A60Ab",
+    "latest"
+  )
+
+Utils.hex_to_int(balance)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+1132740487686380825
+```
+
+## 智能合约
+
+```elixir
+tx_hash = "0x545EDf91e91b96cFA314485F5d2A1757Be11d384"
+Ethereumex.HttpClient.eth_get_transaction_by_hash(tx_hash)
+
+Ethereumex.HttpClient.eth_get_block_by_hash(tx_hash)
+```
+
+```elixir
+Ethereumex.HttpClient.eth_gas_price()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, "0x596637a7"}
+```
