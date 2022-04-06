@@ -1,4 +1,5 @@
 <!-- livebook:{"persist_outputs":true} -->
+<!-- vim: set syntax=markdown: -->
 
 # 使用Elixir实现一条简易POW区块链
 
